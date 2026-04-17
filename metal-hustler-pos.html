@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Metal Hustler POS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  :root{
+    --red:#c0392b;--red-dark:#96281b;--red-light:#fdf0ef;
+    --bg:#f5f4f0;--surface:#fff;--border:#e8e4de;
+    --text:#1a1a1a;--muted:#888;--subtle:#bbb;
+    --success:#0F6E56;--radius:12px;--radius-sm:8px;
+  }
+  html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:15px}
+  button{font-family:inherit;cursor:pointer}
+
+  /* LAYOUT */
+  .pos{display:grid;grid-template-columns:1fr 340px;height:100vh;overflow:hidden}
+  @media(max-width:768px){.pos{grid-template-columns:1fr;grid-template-rows:1fr auto}}
+
+  /* LEFT PANEL */
+  .left{display:flex;flex-direction:column;gap:12px;padding:14px;overflow:hidden;background:var(--bg)}
+
+  /* HEADER */
+  .header{display:flex;align-items:center;gap:10px}
+  .logo{width:36px;height:36px;background:var(--red);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .brand-name{font-size:16px;font-weight:600;color:var(--text)}
+  .brand-sub{font-size:11px;color:var(--muted)}
+  .header-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .clock{font-size:13px;font-weight:500;color:var(--muted);background:var(--surface);border:1px solid var(--border);padding:5px 10px;border-radius:var(--radius-sm)}
+  .hbtn{padding:5px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;font-weight:500;transition:all .15s}
+  .hbtn:hover{border-color:var(--red);color:var(--red)}
+  .hbtn.danger{border-color:#f5c6c6;color:var(--red)}
+
+  /* SEARCH */
+  .search{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 13px}
+  .search input{flex:1;border:none;background:transparent;font-size:14px;color:var(--text);outline:none;font-family:inherit}
+  .search input::placeholder{color:var(--subtle)}
+
+  /* CATEGORIES */
+  .cats{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;flex-shrink:0}
+  .cats::-webkit-scrollbar{display:none}
+  .cat{padding:7px 16px;border-radius:20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:13px;font-weight:500;white-space:nowrap;transition:all .15s}
+  .cat.active{background:var(--red);border-color:var(--red);color:#fff}
+  .cat:hover:not(.active){border-color:var(--red);color:var(--red)}
+
+  /* GRID */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px;overflow-y:auto;flex:1;padding-right:2px}
+  .grid::-webkit-scrollbar{width:4px}
+  .grid::-webkit-scrollbar-track{background:transparent}
+  .grid::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:all .12s;display:flex;flex-direction:column;gap:8px;user-select:none}
+  .card:hover{border-color:var(--red);box-shadow:0 2px 8px rgba(192,57,43,0.1)}
+  .card:active{transform:scale(0.96)}
+  .card-emoji{font-size:26px;line-height:1}
+  .card-name{font-size:14px;font-weight:500;color:var(--text);line-height:1.3}
+  .card-price{font-size:13px;font-weight:600;color:var(--red)}
+  .card-cat{font-size:11px;background:var(--red-light);color:var(--red);padding:2px 8px;border-radius:10px;display:inline-block;width:fit-content}
+  .card.unavailable{opacity:0.4;cursor:not-allowed}
+
+  /* RIGHT PANEL */
+  .right{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+  .cart-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+  .cart-head h2{font-size:15px;font-weight:600}
+  .order-num{font-size:12px;color:var(--muted);background:var(--bg);padding:3px 10px;border-radius:20px;border:1px solid var(--border)}
+  .cart-list{flex:1;overflow-y:auto}
+  .cart-list::-webkit-scrollbar{width:3px}
+  .cart-list::-webkit-scrollbar-thumb{background:var(--border)}
+  .empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:var(--muted);font-size:13px;padding:24px;text-align:center}
+  .empty-icon{font-size:36px;opacity:.5}
+  .ci{display:flex;align-items:center;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border)}
+  .ci-info{flex:1;min-width:0}
+  .ci-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ci-unit{font-size:11px;color:var(--muted)}
+  .qty{display:flex;align-items:center;gap:5px}
+  .qbtn{width:24px;height:24px;border-radius:50%;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;display:flex;align-items:center;justify-content:center;font-weight:500;transition:all .12s}
+  .qbtn:hover{border-color:var(--red);color:var(--red)}
+  .qnum{font-size:13px;font-weight:600;min-width:20px;text-align:center}
+  .ci-total{font-size:13px;font-weight:600;min-width:60px;text-align:right;color:var(--text)}
+
+  /* SUMMARY */
+  .summary{padding:14px 16px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:7px}
+  .srow{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+  .srow.total{font-size:16px;font-weight:600;color:var(--text);padding-top:6px;border-top:1px solid var(--border)}
+  .srow.disc span:last-child{color:var(--success);font-weight:500}
+
+  /* PAYMENT BUTTONS */
+  .pay-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px 10px}
+  .pbtn{padding:11px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;font-weight:600;transition:all .12s}
+  .pbtn.tunai{background:#f0faf6;border-color:#9FE1CB;color:var(--success)}
+  .pbtn.qris{background:var(--red);border-color:var(--red);color:#fff}
+  .pbtn:hover{opacity:.85}
+  .charge-btn{margin:0 16px 14px;padding:14px;border-radius:var(--radius-sm);background:var(--red);border:none;color:#fff;font-size:15px;font-weight:600;width:calc(100% - 32px);transition:all .12s}
+  .charge-btn:hover:not(:disabled){background:var(--red-dark)}
+  .charge-btn:active:not(:disabled){transform:scale(0.98)}
+  .charge-btn:disabled{background:var(--border);color:var(--muted);cursor:default}
+
+  /* MODAL */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:999;padding:16px;backdrop-filter:blur(2px)}
+  .modal{background:var(--surface);border-radius:var(--radius);padding:24px;width:100%;max-width:360px;display:flex;flex-direction:column;gap:16px;max-height:90vh;overflow-y:auto}
+  .modal-title{font-size:18px;font-weight:600}
+  .modal-sub{font-size:13px;color:var(--muted)}
+  .modal-amount{font-size:34px;font-weight:700;color:var(--text);text-align:center;padding:8px 0}
+  .modal-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .mbtn{padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;font-weight:500}
+  .mbtn.success{background:var(--success);border-color:var(--success);color:#fff}
+  .mbtn.primary{background:var(--red);border-color:var(--red);color:#fff}
+  .mbtn.full{grid-column:1/-1}
+
+  /* QR BOX */
+  .qr-box{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px}
+  .qr-box img{width:230px;height:230px;object-fit:contain;border-radius:8px}
+  .qr-store{font-size:14px;font-weight:600;color:var(--red);text-align:center}
+  .qr-nmid{font-size:11px;color:var(--muted)}
+  .qr-wallets{font-size:11px;color:var(--muted);text-align:center;line-height:1.6}
+
+  /* INPUTS */
+  .inp{width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border .15s}
+  .inp:focus{border-color:var(--red)}
+  textarea.inp{resize:none}
+  .inp-row{display:flex;gap:8px}
+  .inp-row .inp{flex:1}
+  .inp-row button{padding:10px 14px;border-radius:var(--radius-sm);border:none;background:var(--red);color:#fff;font-size:13px;font-weight:500}
+
+  /* SUCCESS */
+  .success-anim{font-size:56px;text-align:center;animation:pop .3s ease}
+  @keyframes pop{0%{transform:scale(0.5)}80%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none}
+  .toast.show{opacity:1}
+
+  /* LOADING */
+  .loading-screen{position:fixed;inset:0;background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:9999}
+  .loading-logo{width:56px;height:56px;background:var(--red);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px}
+  .loading-text{font-size:14px;color:var(--muted);font-weight:500}
+  .spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div class="loading-screen" id="loading">
+  <div class="loading-logo">🍵</div>
+  <div style="font-size:18px;font-weight:700">Metal Hustler</div>
+  <div class="spinner"></div>
+  <div class="loading-text" id="loading-text">Memuat sistem...</div>
+</div>
+
+<div class="pos" id="pos" style="display:none">
+  <!-- LEFT -->
+  <div class="left">
+    <div class="header">
+      <div class="logo">🍵</div>
+      <div>
+        <div class="brand-name">Metal Hustler</div>
+        <div class="brand-sub">Toko Minuman</div>
+      </div>
+      <div class="header-right">
+        <div class="clock" id="clock">--:--</div>
+        <button class="hbtn" onclick="openDiscount()">Diskon</button>
+        <button class="hbtn" onclick="openNote()">Catatan</button>
+        <button class="hbtn danger" onclick="clearAll()">Hapus</button>
+      </div>
+    </div>
+    <div class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" id="search" placeholder="Cari menu..." oninput="renderItems()">
+    </div>
+    <div class="cats" id="cats"></div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right">
+    <div class="cart-head">
+      <h2>Pesanan</h2>
+      <div class="order-num" id="order-num">No. #001</div>
+    </div>
+    <div class="cart-list" id="cart-list"></div>
+    <div id="cart-bottom"></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://qndsunwdcokgrrnrllnr.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFuZHN1bndkY29rZ3JybnJsbG5yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0Mjg5MjMsImV4cCI6MjA5MjAwNDkyM30.jBeMFmrVjwPRm0hjxIjFWd24yO1DxAJrqwdlmhPmztM';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let MENU = [];
+let cart = [], activeCat = 'Semua', discount = 0, orderNum = 1, note = '';
+
+function fmt(n){ return 'Rp ' + Math.round(n).toLocaleString('id-ID'); }
+
+function updateClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+}
+setInterval(updateClock, 1000); updateClock();
+
+async function init(){
+  document.getElementById('loading-text').textContent = 'Menghubungkan database...';
+  try {
+    const { data, error } = await sb.from('menu_items').select('*').eq('available', true).order('category').order('name');
+    if(error) throw error;
+    MENU = data;
+    document.getElementById('loading-text').textContent = 'Memuat menu...';
+    await new Promise(r => setTimeout(r, 400));
+
+    // Get last order number
+    const { data: lastOrder } = await sb.from('orders').select('order_number').order('id', {ascending: false}).limit(1);
+    if(lastOrder && lastOrder.length > 0){
+      const lastNum = parseInt(lastOrder[0].order_number.replace('#','')) || 0;
+      orderNum = lastNum;
+    }
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('pos').style.display = 'grid';
+    renderCats(); renderItems(); renderCart();
+  } catch(e){
+    document.getElementById('loading-text').textContent = 'Gagal terhubung. Cek koneksi internet.';
+    console.error(e);
+  }
+}
+
+function getCats(){
+  return ['Semua', ...new Set(MENU.map(i => i.category))];
+}
+
+function renderCats(){
+  const cats = getCats();
+  document.getElementById('cats').innerHTML = cats.map(c =>
+    `<button class="cat${c===activeCat?' active':''}" onclick="setCat('${c}')">${c}</button>`
+  ).join('');
+}
+
+function setCat(c){ activeCat = c; renderCats(); renderItems(); }
+
+function renderItems(){
+  const q = document.getElementById('search').value.toLowerCase();
+  const items = MENU.filter(i =>
+    (activeCat === 'Semua' || i.category === activeCat) &&
+    (!q || i.name.toLowerCase().includes(q))
+  );
+  document.getElementById('grid').innerHTML = items.length
+    ? items.map(i => `
+      <div class="card${!i.available?' unavailable':''}" onclick="addToCart(${i.id})">
+        <div class="card-emoji">${i.emoji || '🍵'}</div>
+        <div class="card-name">${i.name}</div>
+        <div class="card-price">${fmt(i.price)}</div>
+        <div class="card-cat">${i.category}</div>
+      </div>`).join('')
+    : `<div style="color:var(--muted);font-size:14px;padding:20px;grid-column:1/-1">Menu tidak ditemukan</div>`;
+}
+
+function addToCart(id){
+  const item = MENU.find(i => i.id === id);
+  if(!item || !item.available) return;
+  const ex = cart.find(i => i.id === id);
+  if(ex) ex.qty++; else cart.push({...item, qty: 1});
+  renderCart();
+}
+
+function changeQty(id, d){
+  const i = cart.findIndex(x => x.id === id);
+  if(i < 0) return;
+  cart[i].qty += d;
+  if(cart[i].qty <= 0) cart.splice(i, 1);
+  renderCart();
+}
+
+function getAmounts(){
+  const sub = cart.reduce((s,i) => s + i.price * i.qty, 0);
+  const disc = Math.min(discount, sub);
+  const tax = Math.round((sub - disc) * 0.1);
+  const tot = sub - disc + tax;
+  return { sub, disc, tax, tot };
+}
+
+function renderCart(){
+  const list = document.getElementById('cart-list');
+  const bottom = document.getElementById('cart-bottom');
+
+  if(!cart.length){
+    list.innerHTML = `<div class="empty"><div class="empty-icon">🛒</div>Keranjang kosong<div style="font-size:12px;margin-top:2px">Ketuk menu untuk menambah</div></div>`;
+    bottom.innerHTML = `<button class="charge-btn" disabled>Tambah item untuk bayar</button>`;
+    return;
+  }
+
+  list.innerHTML = cart.map(i => `
+    <div class="ci">
+      <div class="ci-info">
+        <div class="ci-name">${i.emoji} ${i.name}</div>
+        <div class="ci-unit">${fmt(i.price)} / pcs</div>
+      </div>
+      <div class="qty">
+        <button class="qbtn" onclick="changeQty(${i.id},-1)">−</button>
+        <span class="qnum">${i.qty}</span>
+        <button class="qbtn" onclick="changeQty(${i.id},1)">+</button>
+      </div>
+      <div class="ci-total">${fmt(i.price * i.qty)}</div>
+    </div>`).join('');
+
+  const { sub, disc, tax, tot } = getAmounts();
+  bottom.innerHTML = `
+    <div class="summary">
+      <div class="srow"><span>Subtotal</span><span>${fmt(sub)}</span></div>
+      ${disc > 0 ? `<div class="srow disc"><span>Diskon</span><span>-${fmt(disc)}</span></div>` : ''}
+      <div class="srow"><span>Pajak (10%)</span><span>${fmt(tax)}</span></div>
+      <div class="srow total"><span>Total</span><span>${fmt(tot)}</span></div>
+    </div>
+    <div class="pay-row">
+      <button class="pbtn tunai" onclick="openCash()">💵 Tunai</button>
+      <button class="pbtn qris" onclick="openQR()">📱 QRIS</button>
+    </div>
+    <button class="charge-btn" onclick="openQR()">Bayar ${fmt(tot)}</button>`;
+}
+
+function clearAll(){
+  cart = []; discount = 0; note = '';
+  document.getElementById('search').value = '';
+  renderCart();
+}
+
+function showModal(html){ document.getElementById('modal-root').innerHTML = `<div class="overlay">${html}</div>`; }
+function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
+
+function openQR(){
+  if(!cart.length) return;
+  const { tot } = getAmounts();
+  showModal(`<div class="modal">
+    <div class="modal-title">Pembayaran QRIS</div>
+    <div class="modal-sub">Minta pelanggan scan QR berikut</div>
+    <div class="modal-amount">${fmt(tot)}</div>
+    <div class="qr-box">
+      <img src="QRIS_Metal_Hustler.jpeg" alt="QRIS Metal Hustler">
+      <div class="qr-store">Toko Minuman Metal Hustler</div>
+      <div class="qr-nmid">NMID: ID1026484749035</div>
+      <div class="qr-wallets">GoPay · OVO · Dana · ShopeePay · LinkAja<br>BCA Mobile · dan semua e-wallet lainnya</div>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn" onclick="closeModal()">Batal</button>
+      <button class="mbtn success" onclick="confirmPaid('QRIS')">Diterima ✓</button>
+    </div>
+  </div>`);
+}
+
+function openCash(){
+  if(!cart.length) return;
+  const { tot } = getAmounts();
+  showModal(`<div class="modal">
+    <div class="modal-title">Pembayaran Tunai</div>
+    <div class="modal-amount">${fmt(tot)}</div>
+    <div class="modal-sub">Uang yang diterima:</div>
+    <input type="number" class="inp" id="cash-in" placeholder="0" oninput="calcChange(${tot})" style="font-size:20px;text-align:center">
+    <div id="change-out" style="font-size:15px;font-weight:600;text-align:center;min-height:22px;color:var(--success)"></div>
+    <div class="modal-btns">
+      <button class="mbtn" onclick="closeModal()">Batal</button>
+      <button class="mbtn primary" onclick="confirmPaid('Tunai')">Konfirmasi ✓</button>
+    </div>
+  </div>`);
+}
+
+function calcChange(tot){
+  const v = parseFloat(document.getElementById('cash-in').value) || 0;
+  const el = document.getElementById('change-out');
+  const c = v - tot;
+  if(v > 0) el.textContent = c >= 0 ? 'Kembalian: ' + fmt(c) : '⚠ Kurang: ' + fmt(Math.abs(c));
+  else el.textContent = '';
+}
+
+async function confirmPaid(method){
+  orderNum++;
+  const num = String(orderNum).padStart(3,'0');
+  const { sub, disc, tax, tot } = getAmounts();
+
+  // Save to Supabase
+  const orderData = {
+    order_number: '#' + num,
+    items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+    subtotal: sub,
+    discount: disc,
+    tax: tax,
+    total: tot,
+    payment_method: method,
+    note: note
+  };
+
+  try {
+    const { error } = await sb.from('orders').insert(orderData);
+    if(error) throw error;
+  } catch(e){
+    showToast('⚠ Gagal simpan pesanan, cek koneksi');
+    console.error(e);
+  }
+
+  showModal(`<div class="modal" style="align-items:center;text-align:center">
+    <div class="success-anim">✅</div>
+    <div class="modal-title">Pembayaran Berhasil!</div>
+    <div class="modal-sub">No. #${num} · ${method} · ${fmt(tot)}</div>
+    <div style="font-size:12px;color:var(--muted)">${new Date().toLocaleString('id-ID')}</div>
+    <button class="mbtn success full" onclick="newOrder('${num}')">Pesanan Baru →</button>
+  </div>`);
+}
+
+function newOrder(num){
+  cart = []; discount = 0; note = '';
+  document.getElementById('order-num').textContent = 'No. #' + num;
+  renderCart(); closeModal();
+}
+
+function openDiscount(){
+  showModal(`<div class="modal">
+    <div class="modal-title">Terapkan Diskon</div>
+    <div class="modal-sub">Masukkan jumlah diskon dalam Rupiah</div>
+    <div class="inp-row">
+      <input type="number" class="inp" id="disc-in" placeholder="0" value="${discount || ''}">
+      <button onclick="applyDiscount()">Terapkan</button>
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn" style="color:var(--red);border-color:#f5c6c6" onclick="discount=0;renderCart();closeModal()">Hapus Diskon</button>
+      <button class="mbtn" onclick="closeModal()">Batal</button>
+    </div>
+  </div>`);
+}
+function applyDiscount(){
+  discount = parseFloat(document.getElementById('disc-in').value) || 0;
+  renderCart(); closeModal();
+  showToast('Diskon ' + fmt(discount) + ' diterapkan');
+}
+
+function openNote(){
+  showModal(`<div class="modal">
+    <div class="modal-title">Catatan Pesanan</div>
+    <textarea class="inp" id="note-in" rows="3" placeholder="Tambah catatan untuk pesanan ini...">${note}</textarea>
+    <div class="modal-btns">
+      <button class="mbtn" onclick="closeModal()">Batal</button>
+      <button class="mbtn primary" onclick="note=document.getElementById('note-in').value;closeModal();showToast('Catatan disimpan')">Simpan</button>
+    </div>
+  </div>`);
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>
